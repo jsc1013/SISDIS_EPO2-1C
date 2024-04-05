@@ -4,6 +4,7 @@ import java.rmi.RemoteException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import es.ubu.lsi.client.ChatClient;
 import es.ubu.lsi.common.ChatMessage;
@@ -19,8 +20,22 @@ public class ChatServerImpl implements ChatServer {
 	/**
 	 * Listado de clientes
 	 */
-	// private List<ChatClient> clients;
 	private Map<String, ChatClient> clients;
+
+	/**
+	 * Listado de clientes baneados
+	 */
+	private HashSet<String> bannedClients;
+
+	/**
+	 * Texto para baneo
+	 */
+	private final String BAN_TEXT = "ban";
+
+	/**
+	 * Texto para desbaneo
+	 */
+	private final String UNBAN_TEXT = "unban";
 
 	/**
 	 * Para registro de horas
@@ -40,6 +55,7 @@ public class ChatServerImpl implements ChatServer {
 		sdf = new SimpleDateFormat("HH:mm:ss");
 		nextClientID = 0;
 		clients = new HashMap<String, ChatClient>();
+		bannedClients = new HashSet<String>();
 	}
 
 	/**
@@ -72,32 +88,52 @@ public class ChatServerImpl implements ChatServer {
 	 */
 	public void publish(ChatMessage msg) throws RemoteException {
 
-		if (!clients.containsKey(msg.getNickname())) {
+		if (bannedClients.contains(msg.getNickname())) {
 			return;
 		}
 
-		if (msg.getMessage().startsWith("drop")) {
-
+		if (msg.getMessage().startsWith(BAN_TEXT)) {
 			ChatMessage serverMessage;
-			String userName = msg.getMessage().replace("drop", "");
+			String userName = msg.getMessage().replace(BAN_TEXT, "");
 			userName = userName.trim();
 
-			if (clients.containsKey(userName)) {
-				clients.remove(userName);
-				serverMessage = new ChatMessage(msg.getId(), ("[" + sdf.format(new Date()) + "] Server: "
-						+ " El usuario " + userName + " ha sido desconectado"));
-			} else {
-				serverMessage = new ChatMessage(msg.getId(),
-						("[" + sdf.format(new Date()) + "] Server: " + " El usuario " + userName + " no existe"));
+			if (!bannedClients.contains(userName)) {
+				bannedClients.add(userName);
 			}
 
-			clients.get(msg.getNickname()).receive((serverMessage));
+			serverMessage = new ChatMessage(msg.getId(), ("[" + sdf.format(new Date()) + "] Server: " + " El usuario "
+					+ msg.getNickname() + " ha baneado a usuario " + userName));
+
+			for (Map.Entry<String, ChatClient> client : clients.entrySet()) {
+				if (!bannedClients.contains(client.getValue().getNickName())) {
+					client.getValue().receive(serverMessage);
+				}
+			}
+
+		} else if (msg.getMessage().startsWith(UNBAN_TEXT)) {
+
+			ChatMessage serverMessage;
+			String userName = msg.getMessage().replace(UNBAN_TEXT, "");
+			userName = userName.trim();
+
+			if (bannedClients.contains(userName)) {
+				bannedClients.remove(userName);
+				serverMessage = new ChatMessage(msg.getId(), ("[" + sdf.format(new Date()) + "] Server: "
+						+ " El usuario " + msg.getNickname() + " ha desbaneado a usuario " + userName));
+
+				for (Map.Entry<String, ChatClient> client : clients.entrySet()) {
+					if (!bannedClients.contains(client.getValue().getNickName())) {
+						client.getValue().receive(serverMessage);
+					}
+				}
+			}
 		} else {
 
 			msg.setMessage("[" + sdf.format(new Date()) + "] " + msg.getNickname() + ": " + msg.getMessage());
-
 			for (Map.Entry<String, ChatClient> client : clients.entrySet()) {
-				client.getValue().receive(msg);
+				if (!bannedClients.contains(client.getValue().getNickName())) {
+					client.getValue().receive(msg);
+				}
 			}
 		}
 

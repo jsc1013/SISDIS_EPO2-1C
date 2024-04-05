@@ -91,6 +91,10 @@ public class ChatClientStarter extends UnicastRemoteObject {
 
 			// Obtenemos el id de cliente retornado por el servidor
 			int clientId = server.checkIn(client);
+
+			System.out
+					.println("Id " + clientId + " has been assigned by the server, nickname: " + client.getNickName());
+
 			client.setId(clientId);
 
 			// Ciclo principal
@@ -110,7 +114,7 @@ public class ChatClientStarter extends UnicastRemoteObject {
 			}
 
 		} catch (Exception e) {
-			System.err.println(e.getMessage());
+			System.err.println(e);
 			System.err.println("[" + sdf.format(new Date()) + "]" + " - Error creating client.");
 			System.exit(EXIT_NOK);
 		}
